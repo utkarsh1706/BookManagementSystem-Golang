@@ -1,16 +1,24 @@
 package main
 
 import (
-    "net/http"
 	"log"
+	"net/http"
+
 	"github.com/gorilla/mux"
-	_ "github.com/jinzhu/gorm/dialects/mysql"
+	"github.com/utkarsh1706/Golang-BookManagementSystem/pkg/config"
 	"github.com/utkarsh1706/Golang-BookManagementSystem/pkg/routes"
 )
 
 func main() {
+	// Initialize MongoDB connection
+	config.Connect()
+
+	// Create a new router
 	r := mux.NewRouter()
+
+	// Register routes
 	routes.RegisterBookStoreRoutes(r)
-	http.Handle("/",r)
+
+	// Serve HTTP using the router
 	log.Fatal(http.ListenAndServe("localhost:8080", r))
 }

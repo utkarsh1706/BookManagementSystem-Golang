@@ -1,20 +1,24 @@
 package controllers
 
 import (
+	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"strconv"
+	"time"
+
 	"github.com/gorilla/mux"
 	"github.com/utkarsh1706/Golang-BookManagementSystem/pkg/models"
 	"github.com/utkarsh1706/Golang-BookManagementSystem/pkg/utils"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-var newBook models.Book
-
 func GetBook(w http.ResponseWriter, r *http.Request) {
-	newBook := models.GetAllBooks()
-	res, _ := json.Marshal(newBook)
+	books, err := models.GetAllBooks()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	res, _ := json.Marshal(books)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(res)
@@ -23,11 +27,11 @@ func GetBook(w http.ResponseWriter, r *http.Request) {
 func GetBookById(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	bookId := vars["bookId"]
-	ID, err := strconv.ParseInt(bookId, 0, 0)
-	if err!= nil {
-		fmt.Println("Error parsing book")
+	bookDetails, err := models.GetBookById(bookId)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-	bookDetails, _ := models.GetBookById((ID))
 	res, _ := json.Marshal(bookDetails)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -35,10 +39,18 @@ func GetBookById(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateBook(w http.ResponseWriter, r *http.Request) {
-	CreateBook := &models.Book{}
-	utils.ParseBody(r, CreateBook)
-	b := CreateBook.CreateBook()
-	res, _ := json.Marshal(b)
+	var createBook models.Book
+	utils.ParseBody(r, &createBook)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	result, err := models.CreateBook(ctx, &createBook)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	createBook.ID = result.InsertedID.(primitive.ObjectID)
+	res, _ := json.Marshal(createBook)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	w.Write(res)
@@ -46,42 +58,52 @@ func CreateBook(w http.ResponseWriter, r *http.Request) {
 
 func DeleteBook(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-    bookId := vars["bookId"]
-    ID, err := strconv.ParseInt(bookId, 0, 0)
-    if err!= nil {
-        fmt.Println("Error parsing book")
-    }
-    b := models.DeleteBook(ID)
-    res, _ := json.Marshal(b)
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(http.StatusOK)
-    w.Write(res)
+	bookId := vars["bookId"]
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	result, err := models.DeleteBook(ctx, bookId)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	res, _ := json.Marshal(result)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(res)
 }
 
 func UpdateBook(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-    bookId := vars["bookId"]
-    ID, err := strconv.ParseInt(bookId, 0, 0)
-    if err!= nil {
-        fmt.Println("Error parsing book")
-    }
-    updateBook := &models.Book{}
-    utils.ParseBody(r, updateBook)
-	bookDetails, db := models.GetBookById((ID))
+	bookId := vars["bookId"]
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	updateBook := &models.Book{}
+	utils.ParseBody(r, updateBook)
+	bookDetails, err := models.GetBookById(bookId)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	if updateBook.Name != "" {
 		bookDetails.Name = updateBook.Name
 	}
-	if updateBook.Author!= "" {
-        bookDetails.Author = updateBook.Author
-    }
-	if updateBook.Publication!= "" {
-        bookDetails.Publication = updateBook.Publication
-    }
-    db.Save(&bookDetails)
-	res, _ := json.Marshal(bookDetails)
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(http.StatusOK)
-    w.Write(res)
-}
+	if updateBook.Author != "" {
+		bookDetails.Author = updateBook.Author
+	}
+	if updateBook.Publication != "" {
+		bookDetails.Publication = updateBook.Publication
+	}
 
+	err = models.UpdateBook(ctx, bookId, bookDetails)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	res, _ := json.Marshal(bookDetails)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(res)
+}

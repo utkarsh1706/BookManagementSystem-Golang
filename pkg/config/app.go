@@ -1,22 +1,34 @@
 package config
 
 import (
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/mysql"
+    "context"
+    "log"
+    "time"
+
+    "go.mongodb.org/mongo-driver/mongo"
+    "go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var (
-	db * gorm.DB
-)
+var db *mongo.Client
 
 func Connect() {
-	d, err := gorm.Open("mysql", "utkarsh:utkarshsonam/bookstore?charset=utf8&parseTime=True&loc=Local")
-	if err!= nil {
-        panic("Failed to connect to database!")
+    clientOptions := options.Client().ApplyURI("mongodb+srv://utkarsh:sonamutkarsh@cluster0.fjbuelq.mongodb.net/{0}?retryWrites=true&w=majority")
+
+    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+    defer cancel()
+
+    client, err := mongo.Connect(ctx, clientOptions)
+    if err != nil {
+        log.Fatal(err)
     }
-	db = d
+
+    if err := client.Ping(ctx, nil); err != nil {
+        log.Fatal(err)
+    }
+
+    db = client
 }
 
-func GetDB() *gorm.DB {
-	return db
+func GetDB() *mongo.Client {
+    return db
 }

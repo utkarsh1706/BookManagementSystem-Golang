@@ -2,12 +2,12 @@ package utils
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 )
 
 func ParseBody(r *http.Request, x interface{}) {
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		return
 	}
